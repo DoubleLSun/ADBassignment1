@@ -1,0 +1,6 @@
+*.csv
+*.zip
+datasets/*.sql
+# For an entire folder
+# git rm -r --cached datasets/
+

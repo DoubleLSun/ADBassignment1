@@ -1,0 +1,17 @@
+olist_orders_dataset
+The Parent (1 row per order)
+Order ID, Customer ID, order status code, purchase timestamp, approval time, 
+and actual/estimated delivery dates.
+
+olist_order_items_dataset
+1-to-Many (1+ rows per order)
+Individual products bought inside that order, the seller ID, shipping limit date, 
+and price breakdown per item.
+
+olist_order_payments_dataset1-to-Many 
+(1+ rows per order) 
+Payment methods (credit card, voucher, boleto), number of installments, and payment values.
+
+olist_order_reviews_dataset
+1-to-Many (1+ rows per order)
+Customer satisfaction review scores (1 to 5), comment titles/messages, and submission timestamps.

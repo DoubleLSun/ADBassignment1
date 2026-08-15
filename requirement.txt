@@ -1,0 +1,5 @@
+Analysis topics:
+1. Top revenue by sellers/category/city
+2. Payment method cash flow list (OR Most popular transaction method)
+3. Logistic stability list (Which states have the most delays in delivering products) (estimated delivery date vs actual delivery date)
+4. Top positive/negative reviewed products (questionable because got too many unique products) 
