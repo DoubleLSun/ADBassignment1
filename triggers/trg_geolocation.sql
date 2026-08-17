@@ -1,4 +1,5 @@
 -- checks for LAT and LNG range (most important field)
+-- change state to all capital letter
 DELIMITER $$
 CREATE TRIGGER trg_bi_geolocation 
 BEFORE INSERT
@@ -15,6 +16,8 @@ BEGIN
 		SIGNAL SQLSTATE "45000"
         SET MESSAGE_TEXT = "Longitude out of range: value must be within -180 and 180 degrees";
 	END IF;
+        SET NEW.geolocation_state = UPPER(NEW.geolocation_state);
+
 END$$
 DELIMITER ;
 
