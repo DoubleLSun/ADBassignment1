@@ -51,12 +51,14 @@ SELECT * FROM customers WHERE customer_id = "666666";
 
 -- check if unique id will be empty on update
 -- check if location field will be updated but some of them is null/empty
+-- change state to all capital letters
 DELIMITER $$
 CREATE TRIGGER trg_bu_customers
 BEFORE UPDATE
 ON customers
 FOR EACH ROW
 BEGIN
+	SET NEW.geolocation_state = UPPER(NEW.geolocation_state);
 	IF NEW.customer_unique_id IS NULL THEN
 		SIGNAL SQLSTATE "45000"
 		SET MESSAGE_TEXT = "Update to unique ID cannot be empty";
@@ -71,7 +73,6 @@ BEGIN
 			SET MESSAGE_TEXT = "Update to geolocation fields cannot be partially empty";
 		END IF;
 	END IF;
-	SET NEW.customer_state = UPPER(NEW.customer_state);
 END$$
 DELIMITER ;
 

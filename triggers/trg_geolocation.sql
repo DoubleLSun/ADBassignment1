@@ -6,6 +6,7 @@ BEFORE INSERT
 ON geolocation
 FOR EACH ROW
 BEGIN
+	SET NEW.geolocation_state = UPPER(NEW.geolocation_state);
 	-- checking for latitude outliers
     IF NEW.geolocation_lat < -90 OR NEW.geolocation_lat > 90 THEN
 		SIGNAL SQLSTATE "45000"
@@ -16,7 +17,6 @@ BEGIN
 		SIGNAL SQLSTATE "45000"
         SET MESSAGE_TEXT = "Longitude out of range: value must be within -180 and 180 degrees";
 	END IF;
-        SET NEW.geolocation_state = UPPER(NEW.geolocation_state);
 
 END$$
 DELIMITER ;
@@ -96,7 +96,6 @@ BEFORE UPDATE
 ON geolocation
 FOR EACH ROW
 BEGIN
-	
     IF NEW.geolocation_zip_code_prefix IS NULL
     OR NEW.geolocation_lat IS NULL
     OR NEW.geolocation_lng IS NULL
@@ -105,7 +104,8 @@ BEGIN
 		SIGNAL SQLSTATE "45000"
         SET MESSAGE_TEXT = "1 or more fields cannot be empty";
 	END IF;
-    
+	SET NEW.geolocation_state = UPPER(NEW.geolocation_state);
+
 	IF NEW.geolocation_lat < -90 OR NEW.geolocation_lat > 90 THEN
 		SIGNAL SQLSTATE "45000"
         SET MESSAGE_TEXT = "Latitude out of range: value must be within -90 and 90 degrees";
