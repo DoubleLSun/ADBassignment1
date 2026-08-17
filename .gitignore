@@ -3,4 +3,5 @@
 datasets/*.sql
 # For an entire folder
 # git rm -r --cached datasets/
+import_csv.py
 
