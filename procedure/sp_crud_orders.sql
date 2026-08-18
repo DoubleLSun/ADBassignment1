@@ -10,6 +10,7 @@ DROP PROCEDURE IF EXISTS sp_order_retrieve;
 DROP PROCEDURE IF EXISTS sp_order_update;
 DROP PROCEDURE IF EXISTS sp_order_delete;
 
+-- CRUD for orders table
 -- create new orders
 DELIMITER $$
 CREATE PROCEDURE sp_order_create(
@@ -74,7 +75,8 @@ BEGIN
     SELECT order_id, customer_id, order_status, order_purchase_timestamp, order_delivered_customer_date, order_estimated_delivery_date
     FROM orders
     WHERE (p_order_id IS NULL OR order_id = TRIM(p_order_id))
-      AND (p_status IS NULL OR order_status = TRIM(p_status));
+      AND (p_status IS NULL OR order_status = TRIM(p_status))
+    LIMIT 100;
 END$$
 DELIMITER ;
 -- CALL sp_order_retrieve(NULL,NULL);
@@ -132,9 +134,9 @@ BEGIN
     SAVEPOINT sv_order_purge;
 
     -- Step 1: Wipe downstream relational rows to clear out Foreign Key barriers
-    DELETE FROM olist_order_reviews WHERE order_id = TRIM(p_order_id);
-    DELETE FROM olist_order_payments WHERE order_id = TRIM(p_order_id);
-    DELETE FROM olist_order_items WHERE order_id = TRIM(p_order_id);
+    DELETE FROM order_reviews WHERE order_id = TRIM(p_order_id);
+    DELETE FROM order_payments WHERE order_id = TRIM(p_order_id);
+    DELETE FROM order_items WHERE order_id = TRIM(p_order_id);
 
     -- Step 2: Now it is mathematically safe to remove the parent tracking entity
     DELETE FROM orders WHERE order_id = TRIM(p_order_id);

@@ -4,9 +4,14 @@ USE assignment1;
 SHOW CREATE PROCEDURE sp_seller_create;
 SHOW CREATE PROCEDURE sp_seller_retrieve;
 SHOW CREATE PROCEDURE sp_seller_update;
+SHOW CREATE PROCEDURE sp_seller_delete;
+
+DROP PROCEDURE IF EXISTS sp_seller_create;
+DROP PROCEDURE IF EXISTS sp_seller_retrieve;
+DROP PROCEDURE IF EXISTS sp_seller_update;
+DROP PROCEDURE IF EXISTS sp_seller_delete;
 
 -- CRUD for seller table
-DROP PROCEDURE IF EXISTS sp_seller_create;
 -- Create order
 DELIMITER $$ 
 CREATE PROCEDURE sp_seller_create(
@@ -63,7 +68,6 @@ END$$
 DELIMITER ;
 
 -- retrieve seller
-DROP PROCEDURE IF EXISTS  sp_seller_retrieve;
 DELIMITER $$
 CREATE PROCEDURE sp_seller_retrieve(
     IN p_partial_id VARCHAR(32),
@@ -88,7 +92,6 @@ END$$
 DELIMITER ;
 
 -- update seller
-DROP PROCEDURE IF EXISTS  sp_seller_update;
 DELIMITER $$
 CREATE PROCEDURE sp_seller_update(
     IN p_seller_id VARCHAR(32),
@@ -97,6 +100,8 @@ CREATE PROCEDURE sp_seller_update(
     IN p_new_state VARCHAR(2)
 )
 BEGIN
+    DECLARE t_error INT DEFAULT 0;
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET t_error = 1;
     -- Input validation
     IF p_seller_id IS NULL OR LENGTH(TRIM(p_seller_id)) != 32 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Validation Error: Invalid Seller ID. Must be a non-null 32-character hex string.';
@@ -111,10 +116,6 @@ BEGIN
     IF p_new_state IS NOT NULL AND LENGTH(TRIM(p_new_state)) != 2 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Validation Error: Target modification state code must be exactly 2 characters.';
     END IF;
-
-
-    DECLARE t_error INT DEFAULT 0;
-    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET t_error = 1;
 
     START TRANSACTION;
     SAVEPOINT sv_update;
@@ -135,7 +136,7 @@ BEGIN
 END$$
 DELIMITER ;
 
-DROP PROCEDURE IF EXISTS sp_seller_delete;
+
 DELIMITER $$
 CREATE PROCEDURE sp_seller_delete(
     IN p_seller_id VARCHAR(32)
