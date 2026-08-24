@@ -61,7 +61,7 @@ BEGIN
 	END IF;
 END$$
 DELIMITER ;
-drop trigger trg_bu_orders
+
 
 
 
