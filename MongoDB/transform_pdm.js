@@ -72,26 +72,26 @@ db.stage_products.aggregate([
         }
       },
       product_name_length: {
-        $convert: { input: "$product_name_lenght", to: "int" }
+        $convert: { input: "$product_name_lenght", to: "int", onError: null, onNull: null }
       },
       product_description_length: {
-        $convert: { input: "$product_description_lenght", to: "int" }
+        $convert: { input: "$product_description_lenght", to: "int", onError: null, onNull: null }
       },
       product_photos_qty: {
-        $convert: { input: "$product_photos_qty", to: "int" }
+        $convert: { input: "$product_photos_qty", to: "int", onError: null, onNull: null }
       },
       dimensions: {
         weight_g: {
-          $convert: { input: "$product_weight_g", to: "int" }
+          $convert: { input: "$product_weight_g", to: "int", onError: null, onNull: null }
         },
         length_cm: {
-          $convert: { input: "$product_length_cm", to: "int" }
+          $convert: { input: "$product_length_cm", to: "int", onError: null, onNull: null }
         },
         height_cm: {
-          $convert: { input: "$product_height_cm", to: "int" }
+          $convert: { input: "$product_height_cm", to: "int", onError: null, onNull: null }
         },
         width_cm: {
-          $convert: { input: "$product_width_cm", to: "int" }
+          $convert: { input: "$product_width_cm", to: "int", onError: null, onNull: null }
         }
       }
     }
@@ -103,7 +103,7 @@ print("   Creating indexes on products_collection...");
 db.products_collection.createIndex({ product_id: 1 }, { unique: true });
 db.products_collection.createIndex({ "category.category_name": 1 });
 db.products_collection.createIndex({ "category.category_name_english": 1 });
-print("    / products_collection successfully created.\n");
+print("   ✓ products_collection successfully created.\n");
 
 // -----------------------------------------------------------------------------
 // STEP 2: TRANSFORM CUSTOMERS & SELLERS COLLECTIONS
@@ -129,7 +129,7 @@ db.customers_collection.createIndex({ customer_unique_id: 1 });
 db.customers_collection.createIndex({ customer_zip_code_prefix: 1 });
 db.customers_collection.createIndex({ customer_city: 1 });
 db.customers_collection.createIndex({ customer_state: 1 });
-print("   / customers_collection successfully created.");
+print("   ✓ customers_collection successfully created.");
 
 db.stage_sellers.aggregate([
   {
@@ -162,18 +162,18 @@ db.stage_geolocation.aggregate([
       _id: 1,
       geolocation_zip_code_prefix: { $toString: "$geolocation_zip_code_prefix" },
       geolocation_lat: {
-        $convert: { input: "$geolocation_lat", to: "decimal" }
+        $convert: { input: "$geolocation_lat", to: "decimal", onError: null, onNull: null }
       },
       geolocation_lng: {
-        $convert: { input: "$geolocation_lng", to: "decimal" }
+        $convert: { input: "$geolocation_lng", to: "decimal", onError: null, onNull: null }
       },
       geolocation_city: "$geolocation_city",
       geolocation_state: "$geolocation_state",
       location: {
         type: "Point",
         coordinates: [
-          { $convert: { input: "$geolocation_lng", to: "double"} },
-          { $convert: { input: "$geolocation_lat", to: "double"} }
+          { $convert: { input: "$geolocation_lng", to: "double", onError: 0.0, onNull: 0.0 } },
+          { $convert: { input: "$geolocation_lat", to: "double", onError: 0.0, onNull: 0.0 } }
         ]
       }
     }
@@ -186,7 +186,7 @@ db.geolocation_collection.createIndex({ geolocation_zip_code_prefix: 1 });
 db.geolocation_collection.createIndex({ "location": "2dsphere" });
 db.geolocation_collection.createIndex({ geolocation_city: 1 });
 db.geolocation_collection.createIndex({ geolocation_state: 1 });
-print("   / geolocation_collection successfully created.\n");
+print("   ✓ geolocation_collection successfully created.\n");
 
 // -----------------------------------------------------------------------------
 // STEP 4: TRANSFORM & EMBED ORDERS COLLECTION (THE CORE ECOSYSTEM)
@@ -230,19 +230,19 @@ db.stage_orders.aggregate([
       customer_id: "$customer_id",
       order_status: "$order_status",
       order_purchase_timestamp: {
-        $convert: { input: "$order_purchase_timestamp", to: "date" }
+        $convert: { input: "$order_purchase_timestamp", to: "date", onError: null, onNull: null }
       },
       order_approved_at: {
-        $convert: { input: "$order_approved_at", to: "date" }
+        $convert: { input: "$order_approved_at", to: "date", onError: null, onNull: null }
       },
       order_delivered_carrier_date: {
-        $convert: { input: "$order_delivered_carrier_date", to: "date" }
+        $convert: { input: "$order_delivered_carrier_date", to: "date", onError: null, onNull: null }
       },
       order_delivered_customer_date: {
-        $convert: { input: "$order_delivered_customer_date", to: "date" }
+        $convert: { input: "$order_delivered_customer_date", to: "date", onError: null, onNull: null }
       },
       order_estimated_delivery_date: {
-        $convert: { input: "$order_estimated_delivery_date", to: "date" }
+        $convert: { input: "$order_estimated_delivery_date", to: "date", onError: null, onNull: null }
       },
       
       // Nested Array 1: order_items
@@ -252,18 +252,18 @@ db.stage_orders.aggregate([
           as: "item",
           in: {
             order_item_id: {
-              $convert: { input: "$$item.order_item_id", to: "int" }
+              $convert: { input: "$$item.order_item_id", to: "int", onError: null, onNull: null }
             },
             product_id: "$$item.product_id",
             seller_id: "$$item.seller_id",
             shipping_limit_date: {
-              $convert: { input: "$$item.shipping_limit_date", to: "date" }
+              $convert: { input: "$$item.shipping_limit_date", to: "date", onError: null, onNull: null }
             },
             price: {
-              $convert: { input: "$$item.price", to: "decimal" }
+              $convert: { input: "$$item.price", to: "decimal", onError: null, onNull: null }
             },
             freight_value: {
-              $convert: { input: "$$item.freight_value", to: "decimal" }
+              $convert: { input: "$$item.freight_value", to: "decimal", onError: null, onNull: null }
             }
           }
         }
@@ -276,14 +276,14 @@ db.stage_orders.aggregate([
           as: "pmt",
           in: {
             payment_sequential: {
-              $convert: { input: "$$pmt.payment_sequential", to: "int" }
+              $convert: { input: "$$pmt.payment_sequential", to: "int", onError: null, onNull: null }
             },
             payment_type: "$$pmt.payment_type",
             payment_installments: {
-              $convert: { input: "$$pmt.payment_installments", to: "int" }
+              $convert: { input: "$$pmt.payment_installments", to: "int", onError: null, onNull: null }
             },
             payment_value: {
-              $convert: { input: "$$pmt.payment_value", to: "decimal" }
+              $convert: { input: "$$pmt.payment_value", to: "decimal", onError: null, onNull: null }
             }
           }
         }
@@ -297,15 +297,15 @@ db.stage_orders.aggregate([
           in: {
             review_id: "$$rev.review_id",
             review_score: {
-              $convert: { input: "$$rev.review_score", to: "int" }
+              $convert: { input: "$$rev.review_score", to: "int", onError: null, onNull: null }
             },
             review_comment_title: { $ifNull: ["$$rev.review_comment_title", ""] },
             review_comment_message: { $ifNull: ["$$rev.review_comment_message", ""] },
             review_creation_date: {
-              $convert: { input: "$$rev.review_creation_date", to: "date" }
+              $convert: { input: "$$rev.review_creation_date", to: "date", onError: null, onNull: null }
             },
             review_answer_timestamp: {
-              $convert: { input: "$$rev.review_answer_timestamp", to: "date" }
+              $convert: { input: "$$rev.review_answer_timestamp", to: "date", onError: null, onNull: null }
             }
           }
         }
@@ -323,7 +323,7 @@ db.orders_collection.createIndex({ "order_items.product_id": 1 });
 db.orders_collection.createIndex({ "order_items.seller_id": 1 });
 db.orders_collection.createIndex({ "order_payments.payment_type": 1 });
 db.orders_collection.createIndex({ "order_reviews.review_score": 1 });
-print("   / orders_collection successfully created.\n");
+print("   ✓ orders_collection successfully created.\n");
 
 // -----------------------------------------------------------------------------
 // STEP 5: VERIFICATION AND SUMMARY
