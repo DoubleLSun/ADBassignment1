@@ -30,6 +30,8 @@ SUMMARY_REPORTS = {
     "Top purchase regions (summary)": "Top purchase regions",
     "Region allocation (summary)": "Region allocation",
 }
+STATE_FIRST_REPORT = "Top purchase regions (state-first)"
+STATE_FIRST_ALLOCATION_REPORT = "Region allocation (state-first)"
 
 
 def get_database(uri: str, database_name: str):
@@ -95,6 +97,39 @@ def purchase_regions_summary(limit: int, direction: int) -> list[dict[str, Any]]
             "_id": 0,
             "Region": 1,
             "Order_Count": 1,
+            "Total_Purchase_Price": 1,
+        }},
+        {"$sort": {"Total_Purchase_Price": direction, "Region": 1}},
+        {"$limit": limit},
+    ], allowDiskUse=True))
+
+
+def purchase_regions_state_first(limit: int, direction: int) -> list[dict[str, Any]]:
+    return list(db.customers_collection.aggregate([
+        {"$match": {"customer_state": {"$ne": None}}},
+        {"$group": {
+            "_id": "$customer_state",
+            "customer_ids": {"$push": "$customer_id"},
+        }},
+        {"$lookup": {
+            "from": "orders_collection",
+            "localField": "customer_ids",
+            "foreignField": "customer_id",
+            "as": "orders",
+        }},
+        {"$unwind": "$orders"},
+        {"$unwind": "$orders.order_items"},
+        {"$group": {
+            "_id": "$_id",
+            "Order_Ids": {"$addToSet": "$orders.order_id"},
+            "Total_Purchase_Price": {
+                "$sum": {"$ifNull": ["$orders.order_items.price", 0]},
+            },
+        }},
+        {"$project": {
+            "_id": 0,
+            "Region": "$_id",
+            "Order_Count": {"$size": "$Order_Ids"},
             "Total_Purchase_Price": 1,
         }},
         {"$sort": {"Total_Purchase_Price": direction, "Region": 1}},
@@ -297,6 +332,69 @@ def region_allocation_summary() -> list[dict[str, Any]]:
     ], allowDiskUse=True))
 
 
+def region_allocation_state_first() -> list[dict[str, Any]]:
+    total_sellers = db.sellers_collection.count_documents({})
+    total_customers = db.customers_collection.count_documents({})
+    return list(db.customers_collection.aggregate([
+        {"$match": {"customer_state": {"$ne": None}}},
+        {"$group": {"_id": "$customer_state", "Customer_Count": {"$sum": 1}}},
+        {"$project": {
+            "_id": 0, "Region": "$_id", "Seller_Count": {"$literal": 0},
+            "Customer_Count": 1, "Total_Purchase_Price": {"$literal": 0},
+        }},
+        {"$unionWith": {"coll": "sellers_collection", "pipeline": [
+            {"$match": {"seller_state": {"$ne": None}}},
+            {"$group": {"_id": "$seller_state", "Seller_Count": {"$sum": 1}}},
+            {"$project": {
+                "_id": 0, "Region": "$_id", "Seller_Count": 1,
+                "Customer_Count": {"$literal": 0}, "Total_Purchase_Price": {"$literal": 0},
+            }},
+        ]}},
+        {"$unionWith": {"coll": "customers_collection", "pipeline": [
+            {"$match": {"customer_state": {"$ne": None}}},
+            {"$group": {
+                "_id": "$customer_state", "customer_ids": {"$push": "$customer_id"},
+            }},
+            {"$lookup": {
+                "from": "orders_collection", "localField": "customer_ids",
+                "foreignField": "customer_id", "as": "orders",
+            }},
+            {"$unwind": "$orders"},
+            {"$unwind": "$orders.order_items"},
+            {"$group": {
+                "_id": "$_id",
+                "Total_Purchase_Price": {
+                    "$sum": {"$ifNull": ["$orders.order_items.price", 0]},
+                },
+            }},
+            {"$project": {
+                "_id": 0, "Region": "$_id", "Seller_Count": {"$literal": 0},
+                "Customer_Count": {"$literal": 0}, "Total_Purchase_Price": 1,
+            }},
+        ]}},
+        {"$group": {
+            "_id": "$Region", "Seller_Count": {"$sum": "$Seller_Count"},
+            "Customer_Count": {"$sum": "$Customer_Count"},
+            "Total_Purchase_Price": {"$sum": "$Total_Purchase_Price"},
+        }},
+        {"$project": {
+            "_id": 0, "Region": "$_id",
+            "Seller_Percentage": {"$cond": [
+                {"$gt": [total_sellers, 0]},
+                {"$round": [{"$multiply": [{"$divide": ["$Seller_Count", total_sellers]}, 100]}, 2]},
+                0,
+            ]},
+            "Customer_Percentage": {"$cond": [
+                {"$gt": [total_customers, 0]},
+                {"$round": [{"$multiply": [{"$divide": ["$Customer_Count", total_customers]}, 100]}, 2]},
+                0,
+            ]},
+            "Total_Purchase_Price": 1,
+        }},
+        {"$sort": {"Region": 1}},
+    ], allowDiskUse=True))
+
+
 def refresh_region_summary() -> None:
     db.customers_collection.aggregate([
         {"$match": {"customer_state": {"$ne": None}}},
@@ -361,9 +459,14 @@ st.caption("Interactive reports over the five final PDM collections")
 
 with st.sidebar:
     st.header("Report")
-    selected_report = st.selectbox("Choose a report", [*REPORTS, *SUMMARY_REPORTS])
+    selected_report = st.selectbox(
+        "Choose a report",
+        [*REPORTS, *SUMMARY_REPORTS, STATE_FIRST_REPORT, STATE_FIRST_ALLOCATION_REPORT],
+    )
     if selected_report in REPORTS:
         st.caption(REPORTS[selected_report])
+    elif selected_report in {STATE_FIRST_REPORT, STATE_FIRST_ALLOCATION_REPORT}:
+        st.caption("Customer states first, then indexed order lookup")
     else:
         st.caption("Fast report using the maintained region summary collection")
     st.divider()
@@ -372,7 +475,9 @@ with st.sidebar:
     run_report = st.button("Run report", type="primary", use_container_width=True)
     refresh_summary = st.button("Refresh region summary", use_container_width=True)
 
-    if selected_report in {"Top purchase regions", "Top purchase regions (summary)"}:
+    if selected_report in {
+        "Top purchase regions", "Top purchase regions (summary)", STATE_FIRST_REPORT
+    }:
         region_limit = st.number_input("Number of regions", min_value=1, max_value=100, value=20)
         purchase_order = st.radio("Purchase order", ["Highest first", "Lowest first"])
     elif selected_report in {"Top product categories", "Top reviewed orders"}:
@@ -403,6 +508,10 @@ if run_report:
             rows = purchase_regions(region_limit, -1 if purchase_order == "Highest first" else 1)
         elif selected_report == "Top purchase regions (summary)":
             rows = purchase_regions_summary(region_limit, -1 if purchase_order == "Highest first" else 1)
+        elif selected_report == STATE_FIRST_REPORT:
+            rows = purchase_regions_state_first(
+                region_limit, -1 if purchase_order == "Highest first" else 1
+            )
         elif selected_report == "Shipping delays":
             rows = shipping_delays(min_delay_days)
         elif selected_report == "Payment methods":
@@ -413,6 +522,8 @@ if run_report:
             rows = top_reviewed_orders(result_limit)
         elif selected_report == "Region allocation (summary)":
             rows = region_allocation_summary()
+        elif selected_report == STATE_FIRST_ALLOCATION_REPORT:
+            rows = region_allocation_state_first()
         else:
             rows = region_allocation()
         st.session_state.rows = rows
