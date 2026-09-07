@@ -103,7 +103,7 @@ print("   Creating indexes on products_collection...");
 db.products_collection.createIndex({ product_id: 1 }, { unique: true });
 db.products_collection.createIndex({ "category.category_name": 1 });
 db.products_collection.createIndex({ "category.category_name_english": 1 });
-print("    / products_collection successfully created.\n");
+print("   ✓ products_collection successfully created.\n");
 
 // -----------------------------------------------------------------------------
 // STEP 2: TRANSFORM CUSTOMERS & SELLERS COLLECTIONS
@@ -129,7 +129,7 @@ db.customers_collection.createIndex({ customer_unique_id: 1 });
 db.customers_collection.createIndex({ customer_zip_code_prefix: 1 });
 db.customers_collection.createIndex({ customer_city: 1 });
 db.customers_collection.createIndex({ customer_state: 1 });
-print("   / customers_collection successfully created.");
+print("   ✓ customers_collection successfully created.");
 
 db.stage_sellers.aggregate([
   {
@@ -186,7 +186,7 @@ db.geolocation_collection.createIndex({ geolocation_zip_code_prefix: 1 });
 db.geolocation_collection.createIndex({ "location": "2dsphere" });
 db.geolocation_collection.createIndex({ geolocation_city: 1 });
 db.geolocation_collection.createIndex({ geolocation_state: 1 });
-print("   / geolocation_collection successfully created.\n");
+print("   ✓ geolocation_collection successfully created.\n");
 
 // -----------------------------------------------------------------------------
 // STEP 4: TRANSFORM & EMBED ORDERS COLLECTION (THE CORE ECOSYSTEM)
@@ -323,7 +323,7 @@ db.orders_collection.createIndex({ "order_items.product_id": 1 });
 db.orders_collection.createIndex({ "order_items.seller_id": 1 });
 db.orders_collection.createIndex({ "order_payments.payment_type": 1 });
 db.orders_collection.createIndex({ "order_reviews.review_score": 1 });
-print("   / orders_collection successfully created.\n");
+print("   ✓ orders_collection successfully created.\n");
 
 // -----------------------------------------------------------------------------
 // STEP 5: VERIFICATION AND SUMMARY
