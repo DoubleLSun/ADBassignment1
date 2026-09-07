@@ -25,4 +25,4 @@ db.orders_collection.aggregate([
     }
   },
   { $sort: { Transaction_Count: -1 } }
-]).forEach(printjson);
+], { allowDiskUse: true }).forEach(printjson);

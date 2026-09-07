@@ -46,4 +46,4 @@ db.orders_collection.aggregate([
   },
   { $sort: { Average_Review_Score: -1, Review_Count: -1, Order_ID: 1 } },
   { $limit: 50 }
-]).forEach(printjson);
+], { allowDiskUse: true }).forEach(printjson);

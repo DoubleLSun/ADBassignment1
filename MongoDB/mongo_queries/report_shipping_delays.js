@@ -57,4 +57,4 @@ db.orders_collection.aggregate([
     }
   },
   { $sort: { Total_Delayed_Orders: -1 } }
-]).forEach(printjson);
+], { allowDiskUse: true }).forEach(printjson);

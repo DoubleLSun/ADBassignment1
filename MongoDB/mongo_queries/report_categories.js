@@ -44,4 +44,4 @@ db.orders_collection.aggregate([
   },
   { $sort: { Total_Revenue: -1 } },
   { $limit: limit }
-]).forEach(printjson);
+], { allowDiskUse: true }).forEach(printjson);

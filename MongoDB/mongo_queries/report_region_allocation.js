@@ -103,4 +103,4 @@ db.customers_collection.aggregate([
     }
   },
   { $sort: { Region: 1 } }
-]).forEach(printjson);
+], { allowDiskUse: true }).forEach(printjson);
