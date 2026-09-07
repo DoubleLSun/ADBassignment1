@@ -1,3 +1,4 @@
+USE assignment1;
 -- create the audit log table for trigger
 CREATE TABLE audit_log(
 	log_id INT AUTO_INCREMENT PRIMARY KEY,

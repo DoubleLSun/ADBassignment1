@@ -91,7 +91,7 @@ class MainCRUD:
         proc_name = proc_info["procedure"]
         print(f"\nConnecting to DB to execute {proc_name} with arguments: {args}...")
         try:
-            connector = mc.connect(**self.db_config)
+            connector = mc.connect(**self.db_config)        
             cursor = connector.cursor()
             cursor.execute('SELECT DATABASE()')
             dbname = cursor.fetchone()[0]

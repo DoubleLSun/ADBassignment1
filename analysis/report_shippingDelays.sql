@@ -24,3 +24,4 @@ BEGIN
     ORDER BY Total_Delayed_Orders DESC;
 END$$
 DELIMITER ;
+
