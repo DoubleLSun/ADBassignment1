@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from time import perf_counter
 from typing import Any
 
 import pandas as pd
@@ -283,10 +284,13 @@ if "rows" not in st.session_state:
     st.session_state.rows = []
 if "error" not in st.session_state:
     st.session_state.error = None
+if "query_duration_ms" not in st.session_state:
+    st.session_state.query_duration_ms = None
 
 if run_report:
     try:
         db = get_database(mongo_uri, database_name)
+        query_started_at = perf_counter()
         if selected_report == "Top purchase regions":
             rows = purchase_regions(region_limit, -1 if purchase_order == "Highest first" else 1)
         elif selected_report == "Shipping delays":
@@ -300,9 +304,11 @@ if run_report:
         else:
             rows = region_allocation()
         st.session_state.rows = rows
+        st.session_state.query_duration_ms = (perf_counter() - query_started_at) * 1000
         st.session_state.error = None
     except (PyMongoError, ServerSelectionTimeoutError) as error:
         st.session_state.rows = []
+        st.session_state.query_duration_ms = None
         st.session_state.error = str(error)
 
 if st.session_state.error:
@@ -310,7 +316,9 @@ if st.session_state.error:
 
 if st.session_state.rows:
     result_frame = dataframe(st.session_state.rows)
-    st.metric("Rows returned", len(result_frame))
+    row_metric, duration_metric = st.columns(2)
+    row_metric.metric("Rows returned", len(result_frame))
+    duration_metric.metric("Query time", f"{st.session_state.query_duration_ms:.2f} ms")
     st.dataframe(result_frame, use_container_width=True, hide_index=True)
     st.download_button(
         "Download CSV",
