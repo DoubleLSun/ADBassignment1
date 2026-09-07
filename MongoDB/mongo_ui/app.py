@@ -26,6 +26,10 @@ REPORTS = {
     "Top reviewed orders": "Orders ranked by average review score",
     "Region allocation": "Seller and customer distribution by state",
 }
+SUMMARY_REPORTS = {
+    "Top purchase regions (summary)": "Top purchase regions",
+    "Region allocation (summary)": "Region allocation",
+}
 
 
 def get_database(uri: str, database_name: str):
@@ -78,6 +82,19 @@ def purchase_regions(limit: int, direction: int) -> list[dict[str, Any]]:
             "_id": 0,
             "Region": "$_id",
             "Order_Count": {"$size": "$Order_Ids"},
+            "Total_Purchase_Price": 1,
+        }},
+        {"$sort": {"Total_Purchase_Price": direction, "Region": 1}},
+        {"$limit": limit},
+    ], allowDiskUse=True))
+
+
+def purchase_regions_summary(limit: int, direction: int) -> list[dict[str, Any]]:
+    return list(db.region_summary_collection.aggregate([
+        {"$project": {
+            "_id": 0,
+            "Region": 1,
+            "Order_Count": 1,
             "Total_Purchase_Price": 1,
         }},
         {"$sort": {"Total_Purchase_Price": direction, "Region": 1}},
@@ -260,19 +277,102 @@ def region_allocation() -> list[dict[str, Any]]:
     ], allowDiskUse=True))
 
 
+def region_allocation_summary() -> list[dict[str, Any]]:
+    total_sellers = db.sellers_collection.count_documents({})
+    total_customers = db.customers_collection.count_documents({})
+    return list(db.region_summary_collection.aggregate([
+        {"$set": {
+            "Seller_Percentage": {"$cond": [
+                {"$gt": [total_sellers, 0]},
+                {"$round": [{"$multiply": [{"$divide": ["$Seller_Count", total_sellers]}, 100]}, 2]},
+                None,
+            ]},
+            "Customer_Percentage": {"$cond": [
+                {"$gt": [total_customers, 0]},
+                {"$round": [{"$multiply": [{"$divide": ["$Customer_Count", total_customers]}, 100]}, 2]},
+                None,
+            ]},
+        }},
+        {"$sort": {"Region": 1}},
+    ], allowDiskUse=True))
+
+
+def refresh_region_summary() -> None:
+    db.customers_collection.aggregate([
+        {"$match": {"customer_state": {"$ne": None}}},
+        {"$group": {"_id": "$customer_state", "Customer_Count": {"$sum": 1}}},
+        {"$project": {
+            "_id": 0, "Region": "$_id", "Seller_Count": {"$literal": 0},
+            "Customer_Count": 1, "Order_Count": {"$literal": 0},
+            "Total_Purchase_Price": {"$literal": 0},
+        }},
+        {"$unionWith": {"coll": "sellers_collection", "pipeline": [
+            {"$match": {"seller_state": {"$ne": None}}},
+            {"$group": {"_id": "$seller_state", "Seller_Count": {"$sum": 1}}},
+            {"$project": {
+                "_id": 0, "Region": "$_id", "Seller_Count": 1,
+                "Customer_Count": {"$literal": 0}, "Order_Count": {"$literal": 0},
+                "Total_Purchase_Price": {"$literal": 0},
+            }},
+        ]}},
+        {"$unionWith": {"coll": "orders_collection", "pipeline": [
+            {"$lookup": {
+                "from": "customers_collection", "localField": "customer_id",
+                "foreignField": "customer_id",
+                "pipeline": [{"$project": {"_id": 0, "customer_state": 1}}],
+                "as": "customer",
+            }},
+            {"$set": {
+                "customer_state": {"$arrayElemAt": ["$customer.customer_state", 0]},
+                "purchase_total": {"$reduce": {
+                    "input": {"$ifNull": ["$order_items", []]},
+                    "initialValue": 0,
+                    "in": {"$add": ["$$value", {"$ifNull": ["$$this.price", 0]}]},
+                }},
+            }},
+            {"$match": {"customer_state": {"$ne": None}}},
+            {"$group": {
+                "_id": "$customer_state", "Order_Count": {"$sum": 1},
+                "Total_Purchase_Price": {"$sum": "$purchase_total"},
+            }},
+            {"$project": {
+                "_id": 0, "Region": "$_id", "Seller_Count": {"$literal": 0},
+                "Customer_Count": {"$literal": 0}, "Order_Count": 1,
+                "Total_Purchase_Price": 1,
+            }},
+        ]}},
+        {"$group": {
+            "_id": "$Region", "Seller_Count": {"$sum": "$Seller_Count"},
+            "Customer_Count": {"$sum": "$Customer_Count"},
+            "Order_Count": {"$sum": "$Order_Count"},
+            "Total_Purchase_Price": {"$sum": "$Total_Purchase_Price"},
+        }},
+        {"$project": {
+            "_id": 0, "Region": "$_id", "Seller_Count": 1,
+            "Customer_Count": 1, "Order_Count": 1, "Total_Purchase_Price": 1,
+        }},
+        {"$out": "region_summary_collection"},
+    ], allowDiskUse=True)
+    db.region_summary_collection.create_index("Region", unique=True)
+
+
 st.title("E-Commerce MongoDB Reports")
 st.caption("Interactive reports over the five final PDM collections")
 
 with st.sidebar:
     st.header("Report")
-    selected_report = st.selectbox("Choose a report", list(REPORTS))
-    st.caption(REPORTS[selected_report])
+    selected_report = st.selectbox("Choose a report", [*REPORTS, *SUMMARY_REPORTS])
+    if selected_report in REPORTS:
+        st.caption(REPORTS[selected_report])
+    else:
+        st.caption("Fast report using the maintained region summary collection")
     st.divider()
     mongo_uri = st.text_input("MongoDB URI", "mongodb://127.0.0.1:27017")
     database_name = st.text_input("Database", "ecommerce_db")
     run_report = st.button("Run report", type="primary", use_container_width=True)
+    refresh_summary = st.button("Refresh region summary", use_container_width=True)
 
-    if selected_report == "Top purchase regions":
+    if selected_report in {"Top purchase regions", "Top purchase regions (summary)"}:
         region_limit = st.number_input("Number of regions", min_value=1, max_value=100, value=20)
         purchase_order = st.radio("Purchase order", ["Highest first", "Lowest first"])
     elif selected_report in {"Top product categories", "Top reviewed orders"}:
@@ -287,12 +387,22 @@ if "error" not in st.session_state:
 if "query_duration_ms" not in st.session_state:
     st.session_state.query_duration_ms = None
 
+if refresh_summary:
+    try:
+        db = get_database(mongo_uri, database_name)
+        refresh_region_summary()
+        st.success("Region summary refreshed.")
+    except (PyMongoError, ServerSelectionTimeoutError) as error:
+        st.error(f"Could not refresh region summary: {error}")
+
 if run_report:
     try:
         db = get_database(mongo_uri, database_name)
         query_started_at = perf_counter()
         if selected_report == "Top purchase regions":
             rows = purchase_regions(region_limit, -1 if purchase_order == "Highest first" else 1)
+        elif selected_report == "Top purchase regions (summary)":
+            rows = purchase_regions_summary(region_limit, -1 if purchase_order == "Highest first" else 1)
         elif selected_report == "Shipping delays":
             rows = shipping_delays(min_delay_days)
         elif selected_report == "Payment methods":
@@ -301,6 +411,8 @@ if run_report:
             rows = product_categories(result_limit)
         elif selected_report == "Top reviewed orders":
             rows = top_reviewed_orders(result_limit)
+        elif selected_report == "Region allocation (summary)":
+            rows = region_allocation_summary()
         else:
             rows = region_allocation()
         st.session_state.rows = rows
