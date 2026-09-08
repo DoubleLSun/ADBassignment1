@@ -11,15 +11,43 @@ function explainReport(name, collectionName, pipeline) {
   const result = db.getCollection(collectionName)
     .explain("executionStats")
     .aggregate(pipeline, { allowDiskUse: true });
-  const stats = result.executionStats || {};
+
+  // Aggregation explain output can place execution statistics at different
+  // levels, so collect the first available value from the whole explain tree.
+  function findMetric(value, metric) {
+    if (!value || typeof value !== "object") {
+      return undefined;
+    }
+    if (value[metric] !== undefined) {
+      return value[metric];
+    }
+    for (const key in value) {
+      const found = findMetric(value[key], metric);
+      if (found !== undefined) {
+        return found;
+      }
+    }
+    return undefined;
+  }
+
+  const metrics = [
+    "executionTimeMillis",
+    "totalDocsExamined",
+    "totalKeysExamined",
+    "nReturned"
+  ];
+  const stats = Object.fromEntries(
+    metrics.map(metric => [metric, findMetric(result, metric) ?? "N/A"])
+  );
 
   print(name);
   printjson({
     executionTimeMillis: stats.executionTimeMillis,
     totalDocsExamined: stats.totalDocsExamined,
     totalKeysExamined: stats.totalKeysExamined,
-    usedDisk: stats.usedDisk,
-    nReturned: stats.nReturned
+    nReturned: stats.nReturned,
+    usedDisk: findMetric(result, "usedDisk") ?? "N/A",
+    spills: findMetric(result, "spills") ?? "N/A"
   });
   print("");
 }
@@ -61,12 +89,20 @@ explainReport("Payment methods", "orders_collection", [
 ]);
 
 explainReport("Top purchase regions", "orders_collection", [
-  { $project: { customer_state: 1, order_id: 1, order_items: 1 } },
-  { $match: { customer_state: { $ne: null } } },
+  { $project: { customer_id: 1, order_id: 1, order_items: 1 } },
+  {
+    $lookup: {
+      from: "customers_collection",
+      localField: "customer_id",
+      foreignField: "customer_id",
+      as: "customer"
+    }
+  },
+  { $unwind: "$customer" },
   { $unwind: "$order_items" },
   {
     $group: {
-      _id: "$customer_state",
+      _id: "$customer.customer_state",
       Order_Ids: { $addToSet: "$order_id" },
       Total_Purchase_Price: { $sum: { $ifNull: ["$order_items.price", 0] } }
     }
@@ -79,6 +115,7 @@ explainReport("Shipping delays", "orders_collection", [
   {
     $project: {
       order_status: 1,
+      customer_id: 1,
       customer_state: 1,
       order_estimated_delivery_date: 1,
       order_delivered_customer_date: 1
@@ -108,8 +145,17 @@ explainReport("Shipping delays", "orders_collection", [
     }
   },
   { $match: { days_late: { $gte: 5 } } },
-  { $match: { customer_state: { $ne: null } } },
-  { $group: { _id: "$customer_state", count: { $sum: 1 } } }
+  {
+    $lookup: {
+      from: "customers_collection",
+      localField: "customer_id",
+      foreignField: "customer_id",
+      as: "customer"
+    }
+  },
+  { $unwind: "$customer" },
+  { $match: { "customer.customer_state": { $ne: null } } },
+  { $group: { _id: "$customer.customer_state", count: { $sum: 1 } } }
 ]);
 
 explainReport("Top reviewed orders", "orders_collection", [
